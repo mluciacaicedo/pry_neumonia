@@ -1,10 +1,7 @@
-pyautogui
-pillow
-tkcap
-pydicom
-img2pdf
-opencv_python
-matplotlib
-pandas
-tensorflow
-python-xlib
+tensorflow==2.16.1
+numpy>=1.26.0
+opencv-python>=4.9.0
+pillow>=10.2.0
+pydicom>=2.4.3
+tkcap>=0.0.1
+pytest>=8.0.0

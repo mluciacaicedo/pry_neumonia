@@ -1,0 +1,19 @@
+[project]
+name = "uao-neumonia"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy==1.26.4",
+    "opencv-python==4.9.0.80",
+    "pandas>=2.3.2",
+    "pillow>=11.3.0",
+    "pydicom>=3.0.1",
+    "pytest>=8.4.2",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.5",
+    "streamlit>=1.49.1",
+    "tensorflow==2.16.1",
+    "tkcap==0.0.3",
+]

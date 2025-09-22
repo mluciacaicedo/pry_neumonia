@@ -3,19 +3,25 @@
 
 from tkinter import *
 from tkinter import ttk, font, filedialog, Entry
-
 from tkinter.messagebox import askokcancel, showinfo, WARNING
-import getpass
+
 from PIL import ImageTk, Image
 import csv
-import pyautogui
 import tkcap
-import img2pdf
 import numpy as np
 import time
-tf.compat.v1.disable_eager_execution()
-tf.compat.v1.experimental.output_all_intermediates(True)
 import cv2
+import os
+#import getpass
+#import pyautogui
+#import img2pdf
+#tf.compat.v1.disable_eager_execution()
+#tf.compat.v1.experimental.output_all_intermediates(True)
+import pydicom  #NO SE HABIA IMPORTADO
+import tensorflow as tf  #NO SE HABIA IMPORTADO
+# estas dos siguen siendo válidas en TF 2.x
+from tensorflow.keras import backend as K #NO SE HABIA IMPORTADO
+from tensorflow.keras.models import load_model #NO SE HABIA IMPORTADO
 
 
 def grad_cam(array):
@@ -23,22 +29,42 @@ def grad_cam(array):
     model = model_fun()
     preds = model.predict(img)
     argmax = np.argmax(preds[0])
-    output = model.output[:, argmax]
+    #output = model.output[:, argmax]
     last_conv_layer = model.get_layer("conv10_thisone")
-    grads = K.gradients(output, last_conv_layer.output)[0]
-    pooled_grads = K.mean(grads, axis=(0, 1, 2))
-    iterate = K.function([model.input], [pooled_grads, last_conv_layer.output[0]])
-    pooled_grads_value, conv_layer_output_value = iterate(img)
-    for filters in range(64):
-        conv_layer_output_value[:, :, filters] *= pooled_grads_value[filters]
+    #grads = K.gradients(output, last_conv_layer.output)[0]
+    grad_model = tf.keras.models.Model([model.inputs], [last_conv_layer.output, model.output]) #NUEVA
+    #pooled_grads = K.mean(grads, axis=(0, 1, 2))
+    with tf.GradientTape() as tape:                                 #NUEVA reemplaza K.mean/K.gradients por GradientTape Y reduce_mean.
+        conv_out, pred_out = grad_model(img)
+        #Ajuste para manejar salidas envueltas y poder indexar
+        if isinstance(pred_out, (list, tuple)):
+            pred_out = pred_out[0]
+        elif isinstance(pred_out, dict):
+            pred_out = next(iter(pred_out.values()))
+        pred_out = tf.convert_to_tensor(pred_out)
+        loss = pred_out[:, argmax]
+    grads = tape.gradient(loss, conv_out)
+    pooled_grads_value = tf.reduce_mean(grads, axis=(0, 1, 2)).numpy()
+    #iterate = K.function([model.input], [pooled_grads, last_conv_layer.output[0]])
+    conv_layer_output_value = conv_out[0].numpy()  #NUEVA
+    #pooled_grads_value, conv_layer_output_value = iterate(img)
+    #for filters in range(64):
+        #conv_layer_output_value[:, :, filters] *= pooled_grads_value[filters]
+    for i in range(conv_layer_output_value.shape[-1]):
+        conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
+
     # creating the heatmap
     heatmap = np.mean(conv_layer_output_value, axis=-1)
     heatmap = np.maximum(heatmap, 0)  # ReLU
-    heatmap /= np.max(heatmap)  # normalize
-    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[2]))
+    #heatmap /= np.max(heatmap)  # normalize
+    if heatmap.max() > 0:
+        heatmap = heatmap / heatmap.max()
+    #heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[2]))   #NO TIENE EL TAMAÑO DEL ARRAY
+    heatmap = cv2.resize(heatmap, (array.shape[1], array.shape[0]))
     heatmap = np.uint8(255 * heatmap)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    img2 = cv2.resize(array, (512, 512))
+    #img2 = cv2.resize(array, (512, 512)) 
+    img2 = array  #NUEVA, PARA AJUSTARLO AL TAMAÑO DEL ARRAY
     hif = 0.8
     transparency = heatmap * hif
     transparency = transparency.astype(np.uint8)
@@ -46,6 +72,14 @@ def grad_cam(array):
     superimposed_img = superimposed_img.astype(np.uint8)
     return superimposed_img[:, :, ::-1]
 
+# cargar modelo desde el archivo .h5
+modelo = load_model('conv_MLP_84.h5', compile=False)
+modelo.compile(optimizer=tf.keras.optimizers.Adam(),
+               loss=tf.keras.losses.CategoricalCrossentropy(reduction='sum_over_batch_size'),
+               metrics=['accuracy'])
+
+def model_fun():
+    return modelo
 
 def predict(array):
     #   1. call function to pre-process image: it returns image in batch format
@@ -53,8 +87,11 @@ def predict(array):
     #   2. call function to load model and predict: it returns predicted class and probability
     model = model_fun()
     # model_cnn = tf.keras.models.load_model('conv_MLP_84.h5')
-    prediction = np.argmax(model.predict(batch_array_img))
-    proba = np.max(model.predict(batch_array_img)) * 100
+    #prediction = np.argmax(model.predict(batch_array_img))
+    preds = model.predict(batch_array_img)
+    prediction = np.argmax(preds)
+    #proba = np.max(model.predict(batch_array_img)) * 100
+    proba = float(np.max(preds) * 100)
     label = ""
     if prediction == 0:
         label = "bacteriana"
@@ -66,9 +103,9 @@ def predict(array):
     heatmap = grad_cam(array)
     return (label, proba, heatmap)
 
-
 def read_dicom_file(path):
-    img = dicom.read_file(path)
+    #img = dicom.read_file(path) #La librería actual es pydicom, y SE USA dcmread
+    img = pydicom.dcmread(path)  # NUEVA
     img_array = img.pixel_array
     img2show = Image.fromarray(img_array)
     img2 = img_array.astype(float)
@@ -76,7 +113,6 @@ def read_dicom_file(path):
     img2 = np.uint8(img2)
     img_RGB = cv2.cvtColor(img2, cv2.COLOR_GRAY2RGB)
     return img_RGB, img2show
-
 
 def read_jpg_file(path):
     img = cv2.imread(path)
@@ -96,7 +132,7 @@ def preprocess(array):
     array = array / 255
     array = np.expand_dims(array, axis=-1)
     array = np.expand_dims(array, axis=0)
-    return array
+    return array.astype(np.float32)
 
 
 class App:
@@ -189,24 +225,34 @@ class App:
             filetypes=(
                 ("DICOM", "*.dcm"),
                 ("JPEG", "*.jpeg"),
-                ("jpg files", "*.jpg"),
-                ("png files", "*.png"),
+                ("JPG", "*.jpg"),
+                ("PNG", "*.png"),
             ),
         )
         if filepath:
-            self.array, img2show = read_dicom_file(filepath)
-            self.img1 = img2show.resize((250, 250), Image.ANTIALIAS)
-            self.img1 = ImageTk.PhotoImage(self.img1)
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext == ".dcm":
+                self.array, img2show = read_dicom_file(filepath)
+            else:
+                self.array, img2show = read_jpg_file(filepath)
+
+            img2show = img2show.resize((250, 250), Image.Resampling.LANCZOS)
+            self.img1 = ImageTk.PhotoImage(img2show)
+            self.text_img1.delete("1.0", "end")
             self.text_img1.image_create(END, image=self.img1)
             self.button1["state"] = "enabled"
 
     def run_model(self):
         self.label, self.proba, self.heatmap = predict(self.array)
         self.img2 = Image.fromarray(self.heatmap)
-        self.img2 = self.img2.resize((250, 250), Image.ANTIALIAS)
+        #self.img2 = self.img2.resize((250, 250), Image.ANTIALIAS) #se reemplaza por Compatibilidad con Pillow ≥10.
+        self.img2 = self.img2.resize((250, 250), Image.Resampling.LANCZOS)
         self.img2 = ImageTk.PhotoImage(self.img2)
         print("OK")
+        self.text_img2.delete("1.0", "end")
         self.text_img2.image_create(END, image=self.img2)
+        self.text2.delete("1.0", "end")
+        self.text3.delete("1.0", "end")
         self.text2.insert(END, self.label)
         self.text3.insert(END, "{:.2f}".format(self.proba) + "%")
 
@@ -237,8 +283,10 @@ class App:
             self.text1.delete(0, "end")
             self.text2.delete(1.0, "end")
             self.text3.delete(1.0, "end")
-            self.text_img1.delete(self.img1, "end")
-            self.text_img2.delete(self.img2, "end")
+            self.text_img1.delete("1.0", "end")
+            self.text_img2.delete("1.0", "end")
+            self.array = None
+            self.button1["state"] = "disabled"
             showinfo(title="Borrar", message="Los datos se borraron con éxito")
 
 
