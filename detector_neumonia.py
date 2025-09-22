@@ -13,7 +13,7 @@ import time
 import cv2
 import os
 
-# Imports mínimos desde los módulos desacoplados (mismos nombres/firmas)
+# Imports desde los módulos desacoplados
 from read_img import read_dicom_file, read_jpg_file
 from predictor import predict
 

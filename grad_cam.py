@@ -22,7 +22,6 @@ def grad_cam(array):
 
     with tf.GradientTape() as tape:
         conv_out, pred_out = grad_model(img)
-        # Ajuste para manejar salidas envueltas y poder indexar
         if isinstance(pred_out, (list, tuple)):
             pred_out = pred_out[0]
         elif isinstance(pred_out, dict):

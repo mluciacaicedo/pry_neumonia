@@ -1,4 +1,6 @@
 # read_img.py
+# Lee la imagen en formato DICOM para visualizarla en la interfaz gráfica. Además, la convierte a arreglo para su preprocesamiento.
+
 import numpy as np
 import cv2
 from PIL import Image

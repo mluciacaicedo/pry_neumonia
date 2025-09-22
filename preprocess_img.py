@@ -1,4 +1,4 @@
-#Este módulo se encargará de: Redimensionar imágenes al tamaño esperado por el modelo.
+#Este módulo se encargará de: Redimensionar imágenes al tamaño esperado por el modelo. Recibe el arreglo proveniento de read_img.py
 
 # preprocess_img.py
 import cv2
