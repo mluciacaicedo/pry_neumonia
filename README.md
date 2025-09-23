@@ -18,7 +18,7 @@ El sistema integra la técnica de interpretación Grad-CAM, que genera un mapa d
 # Requisitos
 
 1. Python 3.12
-2. TensorFlow 2.16+
+2. uv (recomendao) o pip
 3. Librerías en requirements.txt
 4. Modelo entrenado: conv_MLP_84.h5
 
@@ -30,9 +30,14 @@ Requerimientos necesarios para el funcionamiento:
 
 # 1.Crear y activar entorno virtual
 python -m venv .venv
-.venv\Scripts\activate   # para Windows
+# En Windows
+.venv\Scripts\activate
+# En macOS / Linux
+source .venv/bin/activate
 
 # 2. Instalar dependencias
+uv pip sync requirements.txt
+o si no se tiene uv 
 pip install -r requirements.txt
 
 # 3. Ejecutar aplicación 
@@ -53,9 +58,18 @@ https://drive.google.com/drive/folders/1PFLbGK8T95Mz2CyREFHSlpP7qha4uekV?usp=sha
 
 ## Estructura del proyecto:
 
-UAO-Neumonia/
-│── detector_neumonia.py       # Script principal, Contiene el diseño de la interfaz en Tkinter y lógica de predicción
-│── conv_MLP_84.h5             # Es el modelo preentrenado
+PRY_NEUMONIA/
+│── models/
+    └── model_loader.py
+    └── conv_MLP_84.h5         # Es el modelo preen
+│── reports/                   # carpeta donde se alamcenan los resultado obtenidos en las predicciones
+│── src
+    └── detector_neumonia.py       # Script principal, Contiene el diseño de la interfaz en Tkinter y lógica de predicción
+    └── grad_camp.py     
+    └── integrator.py
+    └── predictor.py
+    └── preprocess_img.py
+    └── read_img.py                    
 │── requirements.txt           # contiene las Dependencias
 │── tests/                     # Carpeta de pruebas unitarias (pytest)
 │    └── test_preprocesar_predecir.py

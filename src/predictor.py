@@ -1,10 +1,17 @@
-#Este módulo se encargará de Tomar una imagen como np.array, y llamar al módulo preprocess_img.py para preparar la imagen.
-
+""
+Este módulo se encarga de realizar la prediccion sobre una imagen medica, tomando la imagen como un arreglo tipo numpy y la envia
+el modulo de preprocesamiento
+""
 # predictor.py
+import sys
+import os
 import numpy as np
+import cv2
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../models'))
 from model_loader import model_fun
-from preprocess_img import preprocess
 from grad_cam import grad_cam
+from preprocess_img import preprocess
 
 def predict(array):
     # preprocesamiento
@@ -22,5 +29,5 @@ def predict(array):
     if prediction == 2:
         label = "viral"
     # Grad-CAM
-    heatmap = grad_cam(array)
+    heatmap = grad_cam(array, batch_array_img)
     return (label, proba, heatmap)

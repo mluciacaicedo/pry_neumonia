@@ -1,17 +1,17 @@
-#Contiene la lógica para generar la visualización Grad-CAM (Class Activation Maps) a partir de una imagen y un modelo ya cargado.
-
 # grad_cam.py
+
+""" 
+Modulo engargado de generar mapas de calor(Grad-CAM) para visualizar las regiones de la imagen
+que influyen mas en la prediccion del modelo
+"""
 import numpy as np
 import cv2
 import tensorflow as tf
-from tensorflow.keras import backend as K 
-from preprocess_img import preprocess
 from model_loader import model_fun
 
-def grad_cam(array):
-    img = preprocess(array)
+def grad_cam(array, batch_array_img):
     model = model_fun()
-    preds = model.predict(img)
+    preds = model.predict(batch_array_img)
     argmax = np.argmax(preds[0])
     last_conv_layer = model.get_layer("conv10_thisone")
 
@@ -21,7 +21,7 @@ def grad_cam(array):
     )
 
     with tf.GradientTape() as tape:
-        conv_out, pred_out = grad_model(img)
+        conv_out, pred_out = grad_model(batch_array_img)
         if isinstance(pred_out, (list, tuple)):
             pred_out = pred_out[0]
         elif isinstance(pred_out, dict):
@@ -31,20 +31,24 @@ def grad_cam(array):
 
     grads = tape.gradient(loss, conv_out)
     pooled_grads_value = tf.reduce_mean(grads, axis=(0, 1, 2)).numpy()
+
     conv_layer_output_value = conv_out[0].numpy()
 
     for i in range(conv_layer_output_value.shape[-1]):
         conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
 
-    # creating the heatmap
     heatmap = np.mean(conv_layer_output_value, axis=-1)
-    heatmap = np.maximum(heatmap, 0)  # ReLU
+    heatmap = np.maximum(heatmap, 0)
     if heatmap.max() > 0:
         heatmap = heatmap / heatmap.max()
+    else:
+        heatmap = np.zeros_like(heatmap)
+
     heatmap = cv2.resize(heatmap, (array.shape[1], array.shape[0]))
     heatmap = np.uint8(255 * heatmap)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    img2 = array  # mantener tamaño del array original
+
+    img2 = array 
     hif = 0.8
     transparency = heatmap * hif
     transparency = transparency.astype(np.uint8)

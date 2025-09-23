@@ -1,6 +1,7 @@
 # integrator.py
-#Este un módulo que integra los demás scripts y retorna solamente lo necesario para ser visualizado en la interfaz
-
+"""
+Este un módulo que integra la lectura de imagenes para ser visualizado en la interfaz
+"""
 from read_img import read_dicom_file, read_jpg_file
 from predictor import predict
 

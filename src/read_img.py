@@ -1,6 +1,7 @@
 # read_img.py
-# Lee la imagen en formato DICOM para visualizarla en la interfaz gráfica. Además, la convierte a arreglo para su preprocesamiento.
-
+"""
+Modulo para la lectura de imagen en formato DICOM, jpg, las convierte a arreglo para su preprocesamiento.
+"""
 import numpy as np
 import cv2
 from PIL import Image
@@ -11,7 +12,7 @@ def read_dicom_file(path):
     img_array = img.pixel_array
     img2show = Image.fromarray(img_array)
     img2 = img_array.astype(float)
-    img2 = (np.maximum(img2, 0) / img2.max()) * 255.0
+    img2 = (img2 - img2.min()) / (img2.max() - img2.min()) * 255.0
     img2 = np.uint8(img2)
     img_RGB = cv2.cvtColor(img2, cv2.COLOR_GRAY2RGB)
     return img_RGB, img2show

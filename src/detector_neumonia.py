@@ -1,21 +1,23 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from tkinter import *
-from tkinter import ttk, font, filedialog, Entry
-from tkinter.messagebox import askokcancel, showinfo, WARNING
-
-from PIL import ImageTk, Image
-import csv
-import tkcap
-import numpy as np
-import time
-import cv2
+# detector_neumonia.py
+"""
+Parte grafica en en Tkinter para el diagnostico de neumonia a partir de imagenes radiograficas
+-Carga de imagenes en formato  DICOM, JPG, JPEG, PNG
+-Preprocesa la imagen y ejecuta el modelo de prediccion
+-Muestra el diagnostico con la probabildiad asociada
+-Genera el reporte en PDF y guarda el historial en CSV dentro de la carpeta reports
+"""
 import os
 
-# Imports desde los módulos desacoplados
-from read_img import read_dicom_file, read_jpg_file
-from predictor import predict
+from tkinter import *
+from tkinter import ttk, filedialog, font 
+from tkinter.messagebox import askokcancel, showinfo, WARNING
+from  read_img import read_dicom_file, read_jpg_file
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from PIL import Image, ImageTk
+from integrator import run_pipeline
+import csv
+import tkcap
 
 class App:
     def __init__(self):
@@ -92,6 +94,10 @@ class App:
 
         #  se reconoce como un elemento de la clase
         self.array = None
+        self.filepath = None  # guardará el archivo cargado
+        self.label = ""
+        self.proba = 0.0
+        self.heatmap = None
 
         #   NUMERO DE IDENTIFICACIÓN PARA GENERAR PDF
         self.reportID = 0
@@ -112,6 +118,7 @@ class App:
             ),
         )
         if filepath:
+            self.filepath = filepath
             ext = os.path.splitext(filepath)[1].lower()
             if ext == ".dcm":
                 self.array, img2show = read_dicom_file(filepath)
@@ -124,37 +131,80 @@ class App:
             self.text_img1.image_create(END, image=self.img1)
             self.button1["state"] = "enabled"
 
+
     def run_model(self):
-        self.label, self.proba, self.heatmap = predict(self.array)
+        self.label, self.proba, self.heatmap = run_pipeline(self.filepath)
+        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        overlay_path = os.path.join(reports_dir, f"overlay_{self.reportID}.png")
+
+        from PIL import Image
+        Image.fromarray(self.heatmap).save(overlay_path)
+
+        self.saved_overlay_path = overlay_path
         self.img2 = Image.fromarray(self.heatmap)
-        self.img2 = self.img2.resize((250, 250), Image.Resampling.LANCZOS)
+        self.img2 = self.img2.resize((250,250), Image.Resampling.LANCZOS)
         self.img2 = ImageTk.PhotoImage(self.img2)
-        print("OK")
         self.text_img2.delete("1.0", "end")
         self.text_img2.image_create(END, image=self.img2)
         self.text2.delete("1.0", "end")
         self.text3.delete("1.0", "end")
         self.text2.insert(END, self.label)
-        self.text3.insert(END, "{:.2f}".format(self.proba) + "%")
+        self.text3.insert(END, f"{self.proba:.2f}%")
 
+    def create_pdf(self):
+        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
+
+        overlay_img = getattr(self, "saved_overlay_path", None)
+        if not overlay_img:
+            from tkinter.messagebox import showinfo
+            showinfo("Error", "Primero debes generar una predicción.")
+            return
+
+        pdf_path = os.path.join(reports_dir, f"Reporte{self.reportID}.pdf")
+
+        # Crear PDF
+        c = canvas.Canvas(pdf_path, pagesize=letter)
+        width, height = letter
+
+        # Encabezado
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, height - 50, "Reporte de Detección de Neumonía")
+
+        # Datos del paciente
+        c.setFont("Helvetica", 12)
+        c.drawString(50, height - 100, f"Cédula Paciente: {self.text1.get()}")
+        c.drawString(50, height - 120, f"Resultado: {self.label}")
+        c.drawString(50, height - 140, f"Probabilidad: {self.proba:.2f}%")
+
+        
+        # Imagen de la predicción
+        img_x = 50
+        img_y = 200
+        img_width = 400
+        img_height = 400
+        c.drawImage(overlay_img, img_x, img_y, width=img_width, height=img_height)
+
+        # Guardar PDF
+        c.save()
+
+        self.reportID += 1
+        from tkinter.messagebox import showinfo
+        showinfo("PDF", f"El PDF fue generado con éxito:\n{pdf_path}")
+
+        
     def save_results_csv(self):
-        with open("historial.csv", "a") as csvfile:
+        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        csv_path = os.path.join(reports_dir, "historial.csv")
+
+        with open(csv_path, "a") as csvfile:
             w = csv.writer(csvfile, delimiter="-")
             w.writerow(
                 [self.text1.get(), self.label, "{:.2f}".format(self.proba) + "%"]
             )
             showinfo(title="Guardar", message="Los datos se guardaron con éxito.")
-
-    def create_pdf(self):
-        cap = tkcap.CAP(self.root)
-        ID = "Reporte" + str(self.reportID) + ".jpg"
-        img = cap.capture(ID)
-        img = Image.open(ID)
-        img = img.convert("RGB")
-        pdf_path = r"Reporte" + str(self.reportID) + ".pdf"
-        img.save(pdf_path)
-        self.reportID += 1
-        showinfo(title="PDF", message="El PDF fue generado con éxito.")
 
     def delete(self):
         answer = askokcancel(
@@ -168,13 +218,7 @@ class App:
             self.text_img2.delete("1.0", "end")
             self.array = None
             self.button1["state"] = "disabled"
-            showinfo(title="Borrar", message="Los datos se borraron con éxito")
-
-
-def main():
-    my_app = App()
-    return 0
-
+            showinfo(title="Borrar", message="Los datos se borraron con éxito")        
 
 if __name__ == "__main__":
-    main()
+    app = App()
