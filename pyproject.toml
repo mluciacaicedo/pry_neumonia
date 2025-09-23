@@ -17,6 +17,8 @@ dependencies = [
     "tensorflow==2.16.1",
     "tkcap==0.0.3",
     "img2pdf>=0.5.1",
+    "reportlab>=3.6.0",
+
 ]
 
 [project.scripts]

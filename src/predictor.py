@@ -1,7 +1,7 @@
-""
+"""
 Este módulo se encarga de realizar la prediccion sobre una imagen medica, tomando la imagen como un arreglo tipo numpy y la envia
 el modulo de preprocesamiento
-""
+"""
 # predictor.py
 import sys
 import os
