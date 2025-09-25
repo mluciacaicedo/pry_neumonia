@@ -93,7 +93,7 @@ Script que recibe el arreglo proveniento de read_img.py, realiza las siguientes 
 - conversión del arreglo de imagen a formato de batch (tensor)
 
 ## load_model.py
-Script que lee el archivo binario del modelo de red neuronal convolucional previamente entrenado llamado 'WilhemNet86.h5'.
+Script que lee el archivo binario del modelo de red neuronal convolucional previamente entrenado llamado 'conv_MLP_84.h5'.
 
 ## grad_cam.py
 Script que recibe la imagen y la procesa, carga el modelo, obtiene la predicción y la capa convolucional de interés para obtener las características relevantes de la imagen.
