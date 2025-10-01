@@ -7,6 +7,8 @@ import pytest
 # Añadir la carpeta raíz del proyecto al sys.path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+SRC = ROOT / "src"
+sys.path.insert(0, str(SRC))
 
 @pytest.fixture
 def imagen_rgb():

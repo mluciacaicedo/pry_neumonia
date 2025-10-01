@@ -23,7 +23,6 @@ El sistema integra la técnica de interpretación Grad-CAM, que genera un mapa d
 4. Modelo entrenado: conv_MLP_84.h5
 
 ---
-
 ## Pasos para la instalación:
 
 Requerimientos necesarios para el funcionamiento:

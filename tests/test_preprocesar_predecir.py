@@ -7,7 +7,7 @@ import importlib.util
 from pathlib import Path
 
 # Cargar el módulo principal
-mod_path = Path(__file__).resolve().parents[1] / "detector_neumonia.py"
+mod_path = Path(__file__).resolve().parents[1] / "src" / "preprocess_img.py"
 spec = importlib.util.spec_from_file_location("detector_neumonia", mod_path)
 app = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app)
