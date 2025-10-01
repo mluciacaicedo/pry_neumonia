@@ -18,10 +18,13 @@ from PIL import Image, ImageTk
 from integrator import run_pipeline
 import csv
 import tkcap
+import cv2
+from controller.controller import PneumoniaController
 
 class App:
     def __init__(self):
         self.root = Tk()
+        self.controller = PneumoniaController()
         self.root.title("Herramienta para la detección rápida de neumonía")
 
         #   BOLD FONT
@@ -99,7 +102,7 @@ class App:
         self.proba = 0.0
         self.heatmap = None
 
-        #   NUMERO DE IDENTIFICACIÓN PARA GENERAR PDF
+        #  NUMERO DE IDENTIFICACIÓN PARA GENERAR PDF
         self.reportID = 0
 
         #   RUN LOOP
@@ -133,78 +136,65 @@ class App:
 
 
     def run_model(self):
-        self.label, self.proba, self.heatmap = run_pipeline(self.filepath)
-        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
-        os.makedirs(reports_dir, exist_ok=True)
-        overlay_path = os.path.join(reports_dir, f"overlay_{self.reportID}.png")
+        result_label, proba, heatmap = self.controller.predict_image(self.filepath)
+        self.label = result_label
+        self.proba = proba
+        self.heatmap = heatmap
 
-        from PIL import Image
-        Image.fromarray(self.heatmap).save(overlay_path)
+        img2 = Image.fromarray(self.heatmap)
+        img2 = img2.resize((250, 250), Image.Resampling.LANCZOS)
 
-        self.saved_overlay_path = overlay_path
-        self.img2 = Image.fromarray(self.heatmap)
-        self.img2 = self.img2.resize((250,250), Image.Resampling.LANCZOS)
-        self.img2 = ImageTk.PhotoImage(self.img2)
+        self.img2_tk = ImageTk.PhotoImage(img2)
         self.text_img2.delete("1.0", "end")
-        self.text_img2.image_create(END, image=self.img2)
+        self.text_img2.image_create("end", image=self.img2_tk)
+
         self.text2.delete("1.0", "end")
         self.text3.delete("1.0", "end")
         self.text2.insert(END, self.label)
         self.text3.insert(END, f"{self.proba:.2f}%")
-
+       
     def create_pdf(self):
         reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
         os.makedirs(reports_dir, exist_ok=True)
-
         overlay_img = getattr(self, "saved_overlay_path", None)
-        if not overlay_img:
+        print("heatmap:", self.heatmap)
+
+        if self.label is None or self.heatmap is None: 
             from tkinter.messagebox import showinfo
             showinfo("Error", "Primero debes generar una predicción.")
             return
-
         pdf_path = os.path.join(reports_dir, f"Reporte{self.reportID}.pdf")
-
-        # Crear PDF
         c = canvas.Canvas(pdf_path, pagesize=letter)
         width, height = letter
-
-        # Encabezado
-        c.setFont("Helvetica-Bold", 16)
+    
         c.drawString(50, height - 50, "Reporte de Detección de Neumonía")
-
-        # Datos del paciente
+        # Datos del paciente 
         c.setFont("Helvetica", 12)
         c.drawString(50, height - 100, f"Cédula Paciente: {self.text1.get()}")
         c.drawString(50, height - 120, f"Resultado: {self.label}")
         c.drawString(50, height - 140, f"Probabilidad: {self.proba:.2f}%")
-
-        
         # Imagen de la predicción
-        img_x = 50
-        img_y = 200
-        img_width = 400
-        img_height = 400
-        c.drawImage(overlay_img, img_x, img_y, width=img_width, height=img_height)
+        img_temp_path = os.path.join(reports_dir, "temp_imag.png")
+        img = Image.fromarray(self.heatmap)
+        img.save(img_temp_path)
 
+        c.drawImage(img_temp_path, 50, height - 550, width=400, height=400)
         # Guardar PDF
         c.save()
-
         self.reportID += 1
         from tkinter.messagebox import showinfo
         showinfo("PDF", f"El PDF fue generado con éxito:\n{pdf_path}")
+        os.remove(img_temp_path)
 
         
     def save_results_csv(self):
         reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
         os.makedirs(reports_dir, exist_ok=True)
         csv_path = os.path.join(reports_dir, "historial.csv")
-
         with open(csv_path, "a") as csvfile:
             w = csv.writer(csvfile, delimiter="-")
-            w.writerow(
-                [self.text1.get(), self.label, "{:.2f}".format(self.proba) + "%"]
-            )
-            showinfo(title="Guardar", message="Los datos se guardaron con éxito.")
+            w.writerow( [self.text1.get(), self.label, "{:.2f}".format(self.proba) + "%"] )
+        showinfo(title="Guardar", message="Los datos se guardaron con éxito.")
 
     def delete(self):
         answer = askokcancel(
